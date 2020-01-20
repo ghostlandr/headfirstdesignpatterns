@@ -102,4 +102,6 @@ This chapter was a good one for boosting my confidence in reading the book as I 
 
 ### Decorator pattern
 
-Going
+Going into this chapter, I assumed we'd be using the @ sign a lot, as I'm used to that from Typescript and the like.
+However, there were no @ signs at all in this chapter. This was also a relief because go doesn't have such things,
+so it would have been interesting to try and figure out how to work around that.
