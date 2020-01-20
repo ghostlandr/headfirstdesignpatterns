@@ -14,13 +14,13 @@ func main() {
 	w.RegisterSubscriber(curr)
 	w.RegisterSubscriber(fore)
 	w.RegisterSubscriber(stat)
-	w.SetMeasurements(23.4, 90, 32)
+	w.NotifySubscribers(23.4, 90, 32)
 
 	w.RemoveSubscriber(curr)
-	w.SetMeasurements(20.3, 80, 40)
+	w.NotifySubscribers(20.3, 80, 40)
 	stat.Display()
-	w.SetMeasurements(10.3, 80, 40)
+	w.NotifySubscribers(10.3, 80, 40)
 	stat.Display()
-	w.SetMeasurements(15.3, 80, 40)
+	w.NotifySubscribers(15.3, 80, 40)
 	stat.Display()
 }

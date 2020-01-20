@@ -7,10 +7,10 @@ type Observer interface {
 type Observable interface {
 	RegisterSubscriber(o Observer)
 	RemoveSubscriber(toRemove Observer)
-	NotifySubscribers()
+	NotifySubscribers(temp, hum, pres float64)
 }
 
-func New() *WeatherData {
+func New() Observable {
 	return &WeatherData{
 	}
 }
@@ -36,19 +36,11 @@ func (w *WeatherData) RemoveSubscriber(toRemove Observer) {
 	}
 }
 
-func (w *WeatherData) NotifySubscribers() {
-	for _, o := range w.observers {
-		o.Update(w.temp, w.humidity, w.pressure)
-	}
-}
-
-func (w *WeatherData) SetMeasurements(temp, hum, pres float64) {
+func (w *WeatherData) NotifySubscribers(temp, hum, pres float64) {
 	w.temp = temp
 	w.humidity = hum
 	w.pressure = pres
-	w.measurementsChanged()
-}
-
-func (w *WeatherData) measurementsChanged() {
-	w.NotifySubscribers()
+	for _, o := range w.observers {
+		o.Update(w.temp, w.humidity, w.pressure)
+	}
 }
