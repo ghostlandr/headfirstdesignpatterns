@@ -16,7 +16,7 @@ func main() {
 	fmt.Printf("%s: $%.2f\n", e.Description(), e.Cost())
 
 	// Add soy
-	e = beverage.Soy(e)
+	e = beverage.Whip(e)
 	fmt.Printf("%s: $%.2f\n", e.Description(), e.Cost())
 
 	// It's a big one (size-related pricing only implemented for soy)

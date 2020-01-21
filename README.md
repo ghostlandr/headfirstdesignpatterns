@@ -105,3 +105,92 @@ This chapter was a good one for boosting my confidence in reading the book as I 
 Going into this chapter, I assumed we'd be using the @ sign a lot, as I'm used to that from Typescript and the like.
 However, there were no @ signs at all in this chapter. This was also a relief because go doesn't have such things,
 so it would have been interesting to try and figure out how to work around that.
+
+This pattern centered around a coffee shop example. You start out with a `Beverage` class which exposes a cost
+method that subclasses override to provide their cost. The coffee shop has four main beverages: dark roast,
+house blend, decaf, and espresso. Then they have the usual suspects available as toppings/condiments: soy milk,
+whip, mocha, and steamed milk. Initially they created a subclass for every combination of beverage, and you can
+imagine the carnage this creates: `DarkRoast`, `DarkRoastMocha`, `DarkRoastMochaWhip`, `DarkRoastSoy`, ... and
+on and on. Dozens of classes. And what about things like double mocha? `DarkRoastMochaMocha`? This is getting
+crazy!
+
+Enter: the decorator pattern. The other principle this chapter introduces is "programming to an interface, not
+a concrete implementation". If we base our implementation off of a Beverage interface, such as this one:
+
+```go
+type Beverage interface {
+    Cost() float64
+    Description() string
+}
+```
+
+We can create a system of decorators that take Beverages and return Beverages, and we can "decorate" (or I would
+probably lean more to calling it "wrapping" but then we don't have the decorator pattern, we have the wrapper
+pattern) our beverages as much as we like. Here are a few examples:
+
+```go
+e := beverage.Espresso()
+e = beverage.Mocha(e)
+e = beverage.Whip(e)
+fmt.Printf("%s: $%.2f\n", e.Description(), e.Cost()) // output: "Espresso, Mocha, Whip: $2.29"
+
+// You can inline them as well - a tad more gross though.
+e2 := beverage.Whip(beverage.Mocha(beverage.Espresso()))
+```
+
+If you were curious, here is some of my implementation of these. It's a bit more annoying than in a true OO
+language with subclassing and such, but really, I could see myself using something like this in real life.
+
+```go
+func Espresso() Beverage {
+	return &espresso{}
+}
+
+type espresso struct{
+	size Size
+}
+
+func (e espresso) Description() string {
+	return "Espresso"
+}
+
+func (e espresso) Cost() float64 {
+	return 1.99
+}
+
+func Mocha(b Beverage) Beverage {
+	return mocha{Beverage: b}
+}
+
+type mocha struct{
+	Beverage
+}
+
+func (m mocha) Description() string {
+	return m.Beverage.Description() + ", Mocha"
+}
+
+func (m mocha) Cost() float64 {
+	return m.Beverage.Cost() + .20
+}
+```
+
+The Description and Cost functions make use of polymorphism (does that still exist in Go? I guess so) to pass on
+their calculations. In some languages (Python is the one that comes to mind) you can create an actual "decorator"
+that you add to the top of a function like this
+
+```python
+@mydecorator
+def my_function():
+```
+
+and by doing so, you gain access to a few lifecycle hooks for the function and you can run your decorator before,
+during(?), or after the function you're wrapping is called. In our code's case I guess we're running our code
+after, since we call the wrapped function and then add our own text.
+
+One of the things they admit to in this chapter is that this _is_ a bit cumbersome. They say this will be helped
+a bit when we start learning the Factory pattern in the next chapter. In my mind the main takeaway from this
+chapter is that you should program to an interface, not a concrete implementation. In go-land, this means you
+should program to an interface, not a concrete struct. This enables you to do all kinds of things (dependency
+injection and testing come to mind first), but I hadn't really grasped the real "why" until reading this chapter
+and the previous one where they start to introduce this concept.
