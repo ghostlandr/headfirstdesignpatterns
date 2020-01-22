@@ -194,3 +194,11 @@ chapter is that you should program to an interface, not a concrete implementatio
 should program to an interface, not a concrete struct. This enables you to do all kinds of things (dependency
 injection and testing come to mind first), but I hadn't really grasped the real "why" until reading this chapter
 and the previous one where they start to introduce this concept.
+
+### Factory pattern
+
+The biggest takeaway I took from this chapter was the Dependency Inversion Principle, which is a fancy name for
+this principle: "Depend on abstractions. Do not depend on concrete classes." The inversion in the name comes from
+the look of your class diagram after you've done some work to implement it. Rather than your classes flowing
+down into each other, as you might normally see in inheritance, you've inverted the flow. Your high-level and
+low-level modules are both depending on the same abstraction.

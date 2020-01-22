@@ -6,11 +6,13 @@ import (
 )
 
 func main() {
-	chiPiStore := pizzastore.ChicagoStylePizzaStore()
+	piStore := pizzastore.ChicagoStylePizzaStore()
 
-	chiPiStore.OrderPizza("cheese")
+	piStore.OrderPizza("cheese")
+	piStore.OrderPizza("pepperoni")
 
-	nyPiStore := pizzastore.NewYorkStylePizzaStore()
+	piStore = pizzastore.NewYorkStylePizzaStore()
 
-	nyPiStore.OrderPizza("pepperoni")
+	piStore.OrderPizza("pepperoni")
+	piStore.OrderPizza("cheese")
 }

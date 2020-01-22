@@ -2,33 +2,30 @@ package pizzas
 
 import (
 	"fmt"
+
+	"headfirstdesigntraining/factory/ingredients"
 )
+
+func NewYorkStyleFactory() Factory {
+	return nyFactory{}
+}
 
 type nyFactory struct {}
 
 func (c nyFactory) CreatePizza(pizzaType string) Pizza {
 	fmt.Printf("Preparing a classy NY-style %s pizza\n", pizzaType)
+	f := ingredients.NYIngredientFactory()
 	switch pizzaType {
 	case "cheese":
-		return nyCheese{}
+		return nyCheese(f)
 	case "pepperoni":
 		return nyPepperoni{}
 	}
 	return nil
 }
 
-type nyCheese struct{}
-
-func (p nyCheese) Prepare() {
-}
-
-func (p nyCheese) Bake() {
-}
-
-func (p nyCheese) Cut() {
-}
-
-func (p nyCheese) Box() {
+func nyCheese(f ingredients.PizzaIngredientFactory) Pizza {
+	return Cheese("New York Cheese", f)
 }
 
 type nyPepperoni struct{}
@@ -46,5 +43,5 @@ func (p nyPepperoni) Cut() {
 }
 
 func (p nyPepperoni) Box() {
-	fmt.Print("Boxing 'er up")
+	fmt.Print("Boxing 'er up\n")
 }
