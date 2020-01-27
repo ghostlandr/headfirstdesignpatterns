@@ -202,3 +202,228 @@ this principle: "Depend on abstractions. Do not depend on concrete classes." The
 the look of your class diagram after you've done some work to implement it. Rather than your classes flowing
 down into each other, as you might normally see in inheritance, you've inverted the flow. Your high-level and
 low-level modules are both depending on the same abstraction.
+
+How does this come into play with factories? Let's use the example from the chapter: Pizza stores.
+
+(side note: I quite enjoy the examples used in this book. I'm sure they are chosen for this very reason, but I
+find them to be very relatable and reasonable. Like we're talking about "the factory pattern" but through the
+lens of a pizza store and franchises, so of course it makes sense to make sure things are created the same way
+every time and things like that, so providing a way for our franchisees to do that is totally necessary.)
+
+We start out with code we've probably all written before. We have one pizza store, with a order pizza method
+and it all looks like this:
+
+```go
+type Pizza interface {
+	Prepare()
+	Bake()
+	Cut()
+	Box()
+}
+
+type PizzaStore interface {
+    OrderPizza(pizzaType string) Pizza
+}
+
+func OrderPizza(pizzaType string) Pizza {
+    var p Pizza
+    switch pizzaType {
+    case "cheese":
+        p = NewCheesePizza()
+    case "pepperoni":
+        p = NewPepperoniPizza()
+    // ... on and on
+    }
+
+    p.Prepare()
+    p.Bake()
+    p.Cut()
+    p.Box()
+    return p
+}
+
+func main() {
+    p := PizzaStore{}
+    pizza := p.OrderPizza("cheese")
+    // weew!
+}
+```
+
+This is fine for our one store, and at least we do have some amount of abstraction here: we're using polymorphism
+to treat every type of pizza the same once we get down to the prepare and ship step. However you can see that this
+quickly grows out of control once we add more pizzas and more regions to our franchise. As well, you can see we're
+using a method like "NewWhateverTypeOfPizza", which means we're now coding to a concrete type rather than an interface,
+and it also means whenever we need to add a new kind of pizza we need to come into this code and modify it to add
+that in, which violates the Open-Closed principle (open to extension, closed to modification). At the moment it is
+very much open to modification - although, if Pizza functionality changed that part would be okay!
+
+How do we improve this? I hope you said "Factories!" because if you did, you nailed it. Let's do that:
+
+```go
+type PizzaStore interface {
+    CreatePizza(pizzaType string) Pizza
+    OrderPizza(pizzaType string) Pizza
+}
+
+type PizzaFactory interface {
+    CreatePizza(pizzaType string) Pizza
+}
+
+type pizzaFactory struct {}
+
+func (p *pizzaFactory) CreatePizza(pizzaType string) Pizza {
+    switch pizzaType {
+    case "cheese":
+        return NewCheesePizza()
+    case "pepperoni":
+        return NewPepperoniPizza()
+    // ... on and on
+    }
+    // Error handling down here in case they gave a weird pizza type
+}
+
+func NewPizzaStore(factory PizzaFactory) PizzaStore {
+    // Embed the factory in our concrete pizza store
+    return &pizzaStore{PizzaFactory: factory}
+}
+
+type pizzaStore struct {
+    PizzaFactory
+}
+
+func (p *pizzaStore) OrderPizza(pizzaType) Pizza {
+    var p Pizza
+    // Use the embedded factory function here to handle creation
+    p = p.CreatePizza(pizzaType)
+    p.Prepare()
+    p.Bake()
+    p.Cut()
+    p.Box()
+    return p
+}
+```
+
+Why is this better? Well, now if we want to add a new pizza type we can just add it into CreatePizza. No need to
+modify OrderPizza, which now follows the Open-Closed principle - it's open to extension by adding new pizzas to
+CreatePizza, but closed to modification as we don't need to do that to add new pizzas.
+
+The next part they go into in the book relies heavily on inheritance. The method above, passing a factory into
+the constructor, is known as the Simple Factory. Here's what they have laid out for their Java application:
+
+```java
+public abstract class PizzaStore {
+    public Pizza orderPizza(String type) {
+        Pizza pizza;
+        pizza = createPizza(type);
+        pizza.Prepare()
+        pizza.Bake()
+        pizza.Cut()
+        pizza.Box()
+        return pizza
+    }
+
+    abstract Pizza createPizza(String type);
+}
+```
+
+Now what you would do is subclass PizzaStore and override createPizza to do your pizza making. This lets us
+nail down the orderPizza method so that it can't be tampered with, but allows us to put the power in the hands of
+the pizza store to create pizzas however they like. In the book they talk about New York style pizza versus Chicago
+style, two very different types of pizza to say the least. So you'd have a ChicagoPizzaStore creating Chicago-style,
+and a NYPizzaStore creating New York-style. Life is good. In Go-land however, all we can really share is the
+interface for making pizzas. We can't provide a piece of functionality for classes to embed, or at least we can't
+prevent them from doing their own thing there, at least not without making some of the structs or interfaces
+internal. I could see if you had a `pizza` (unexported) type and a `orderPizza` method that talked in lower-case
+p pizzas, maybe you could protect that process?
+
+The thing we've specced out in the Java code is known as a Factory Method. Responsibility for what it creates
+is left up to subclasses of the main class. You've managed to decouple the creations from the creator, as any
+changes we make to Pizza won't affect the creating classes, so long as the interface doesn't change.
+
+At the end of the day I think in Go we're "stuck" with the Simple Factory idea: injecting a factory function into
+our constructor method and using it either as an embedded struct or more compositionally. To use Factory Method
+we'd require the ability to inherit functionality from a base class, and we can't do that with Go. We can get
+kind of close though, as I'll show you in my example code.
+
+Here's what I came up with by the end of the chapter:
+
+```go
+type PizzaStore interface {
+	OrderPizza(pizzaType string) pizzas.Pizza
+	CreatePizza(pizzaType string) pizzas.Pizza
+}
+
+func NewPizzaStore(f pizzas.Factory) PizzaStore {
+	return &pizzaStore{
+		Factory: f,
+	}
+}
+
+type pizzaStore struct{
+	pizzas.Factory
+}
+
+func (p pizzaStore) OrderPizza(pizzaType string) pizzas.Pizza {
+	pizza := p.CreatePizza(pizzaType)
+
+	pizza.Prepare()
+	pizza.Bake()
+	pizza.Cut()
+	pizza.Box()
+
+	return pizza
+}
+```
+
+Before we go on, check out how we _can_ embed the functionality in the struct itself, so it's almost like it is
+inheriting functionality from the factory that we've defined elsewhere. It uses `p.CreatePizza` even though it
+doesn't define that method - it gets that from the embedded struct. Let's look at what a pizzas.Factory looks like:
+
+```go
+type Factory interface {
+	CreatePizza(pizzaType string) Pizza
+}
+
+func ChicagoStyleFactory() Factory {
+	return chicagoFactory{}
+}
+
+type chicagoFactory struct {}
+
+func (c chicagoFactory) CreatePizza(pizzaType string) Pizza {
+	fmt.Printf("Preparing a delectable Chicago-style %s pizza\n", pizzaType)
+	f := ingredients.ChicagoIngredientFactory()
+	switch pizzaType {
+	case "cheese":
+		return Cheese("Chicago Cheese", f)
+	case "pepperoni":
+		return Pepperoni("Chicago Pepperoni", f)
+	}
+	return nil
+}
+```
+
+The chapter introduces ingredient factories near the end of this chapter, so that's what the
+ChicagoIngredientFactory is in the middle there. This lets us apply dependency inversion to the ingredients
+list as well, not just the pizza stores. This seems like another place where inheritance would be helpful as
+I have to define this CreatePizza function on every factory, rather than just inheriting it, but it's still not
+too bad. And we get to create a `Cheese` in each of the factories rather than _completely_ rewriting the wheel
+at least. Anyway, let's put it all together:
+
+```go
+chiPiStore = pizzastore.NewPizzaStore(pizzas.ChicagoStyleFactory())
+
+chiPiStore.OrderPizza("cheese")
+chiPiStore.OrderPizza("pepperoni")
+
+// Imagine a similarly defined factory as the above, but with NY replacing Chicago everywhere.
+// The book had much better differences between the pizzas but I got lazy.
+nyPiStore = pizzastore.NewPizzaStore(pizzas.NYStyleFactory())
+
+nyPiStore.OrderPizza("cheese")
+nyPiStore.OrderPizza("pepperoni")
+```
+
+One of the lessons I keep coming back to throughout the book is "Encapsulate what varies". This seems like a
+great lesson to think about in a lot of the code I write, and the patterns I've been learning so far help us to
+apply it! The book has done a great job so far of building on concepts.
