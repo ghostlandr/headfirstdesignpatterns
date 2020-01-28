@@ -427,3 +427,126 @@ nyPiStore.OrderPizza("pepperoni")
 One of the lessons I keep coming back to throughout the book is "Encapsulate what varies". This seems like a
 great lesson to think about in a lot of the code I write, and the patterns I've been learning so far help us to
 apply it! The book has done a great job so far of building on concepts.
+
+### Singleton pattern
+
+Ah, finally, a simple one. This chapter is as simple as you would hope. They go over how to do get this in Java:
+make your class constructor private and provide a `getInstance` method. In the `getInstance` method you
+instantiate the object if you haven't already, otherwise you just provide the current instance. Simple, right?
+Well, by taking that approach you will be in trouble in a multi-threaded scenario - and we should always assume
+our code is multi-threaded (especially in Go, otherwise what's the point?). To get multi-threaded support, we
+need to do one of the following:
+
+1. Protect it with mutexes (essentially - there is a `synchronized` function keyword you can use in Java, but
+it slows the function down by a factor of 100 :oof:)
+2. Instantiate the initial object at class (or package perhaps) loading time
+3. Use "double-checked locking", which basically means use a mutex but after the initial `if` check. So in cases
+where you already have the object created it won't hit the mutex at all, but it still protects the case where the
+object isn't instantiated yet.
+
+That's pretty much it. The issues with number 1 are related to speed, and number 2 isn't possible in every
+situation. Number 3 is a good combination of the two approaches, depending on your use case.
+
+How can we apply this in Go? Well, let's start by implementing the three things they did. We'll discuss Thingers
+in these examples. Here's one implementation:
+
+```go
+type Thinger interface {
+	Thing()
+}
+
+type thing struct {
+	expensiveDBConnection string
+}
+
+func (t *thing) Thing() {
+	fmt.Println("Whatever exactly this is supposed to do ...")
+}
+```
+
+Here's option 1, the synchronized GetInstance():
+
+```go
+var mu sync.Mutex
+var t *thing
+
+func GetInstance() Thinger {
+	mu.Lock()
+	defer mu.Unlock()
+	if t == nil {
+		t = &thing{expensiveDBConnection: "so expensive"}
+	}
+	return t
+}
+```
+
+We always lock and unlock our mutex, even if we already have a thing created. I assume this is what the
+`synchronized` keyword does or some close analogue to it. Not great, and we can clearly do better. For the Java
+folks though when you're just adding a keyword to a function definition it's not bad if you can accept the
+performance hit. But we can do better.
+
+Here's package init:
+
+```go
+var t Thing = &thing{expensiveDBConnection: "So expensive it's good to do it up front"}
+
+func GetInstance() synchronized.Thinger {
+	return t
+}
+```
+
+Better, but in some cases you can't instantiate things this way because you might need inputs from other packages.
+If you need var definitions from other packages, you could use those in an init function in your package:
+
+```go
+var t *thing
+
+func init() {
+    t = &thing{expensiveDBConnection: otherpackage.Conn}
+}
+
+func GetInstance() Thinger {
+    return t
+}
+```
+
+`init()` runs after variables have been processed but before any other non-init() code runs. So it can be a good
+time to do such things.
+
+Finally, we can do double-checked locking (which is just what it makes sense to do with mutexes):
+
+```go
+var mu sync.Mutex
+var t *thing
+
+func GetInstance() Thinger {
+	if t == nil {
+        mu.Lock()
+        defer mu.Unlock()
+		t = &thing{expensiveDBConnection: "so expensive"}
+	}
+	return t
+}
+```
+
+The only difference is that we lock the mutex inside the if check. Makes sense to me. Here's our final example,
+using sync.Once:
+
+```go
+var t *thing
+var initOnce sync.Once
+
+func GetInstance() synchronized.Thinger {
+	initOnce.Do(func() {
+		t = &thing{expensiveDBConnection: "So expensive"}
+	})
+	return t
+}
+```
+
+`Do` is kind of a neat function. It loads a UInt32 and if that is equal to 0 it runs your function. Otherwise
+it doesn't. The running of your function is also protected by a mutex, so it's an extra secure way to run your
+function _only one time_.
+
+In summary, go has a lot of great ways to initialize singletons, and it's harder to shoot yourself in the foot,
+performance-wise, compared to Java (i.e. the `synchronized` keyword on your function).
