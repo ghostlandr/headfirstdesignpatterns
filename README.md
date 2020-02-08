@@ -550,3 +550,18 @@ function _only one time_.
 
 In summary, go has a lot of great ways to initialize singletons, and it's harder to shoot yourself in the foot,
 performance-wise, compared to Java (i.e. the `synchronized` keyword on your function).
+
+### Command Pattern
+
+The command pattern lets you encapsulate a request as an object. This lets you do a couple of things: you can save
+it for later invocation by some other piece of code; you can abstract object-specific details away from the code
+running the commands (this makes me think of how we did the Deliverer interface in Mission Control); and it lets
+you implement things like undo operations more simply since a command (can) know how to undo what it just did.
+
+The command pattern requires three actors: a client, an invoker, and a receiver. All three of these actors work
+with a Command interface. The receiver knows how to perform the actual commands in question. Let's use the example
+of a light bulb (`Light`). The light exposes two methods: On, and Off. Without the command pattern, your client
+would simply know exactly how to call the light's on and off methods. This is reasonable with a light, but if you
+consider something more complicated - say a thermostat or something with a myriad more settings than a binary
+off/on switch - being able to encapsulate what makes the thermostat go "on" in a command is where they truly shine.
+All that to say, the light bulb is our receiver in this case.
