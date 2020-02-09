@@ -564,4 +564,315 @@ of a light bulb (`Light`). The light exposes two methods: On, and Off. Without t
 would simply know exactly how to call the light's on and off methods. This is reasonable with a light, but if you
 consider something more complicated - say a thermostat or something with a myriad more settings than a binary
 off/on switch - being able to encapsulate what makes the thermostat go "on" in a command is where they truly shine.
-All that to say, the light bulb is our receiver in this case.
+All that to say, the light bulb is our receiver in this case. 
+
+The invoker is the one who will run the actual commands. For this example, we'll use a remote control. Our remote
+control has a bunch of slots that we can put commands into, and the remote invokes each one for us. The remote
+control works with a command interface only. This lets us use dependency inversion, as the remote depends on
+Command and the client composes commands as well. Here's an example command interface:
+
+```go
+type Command interface {
+	Execute()
+}
+```
+
+That's it! Now let's define a simple remote with some commands it can run:
+
+```go
+type Remote interface {
+	SetCommand(slot int, on, off Command)
+	OnButtonWasPressed(slot int)
+	OffButtonWasPressed(slot int)
+}
+
+type remote struct {
+	onCommands []Command
+	offCommands []Command
+}
+
+func NewRemote() Remote {
+	return &remote {
+		// The 7 is arbitrary - simply a 7 slotted remote
+		onCommands:  make([]Command, 7),
+		offCommands: make([]Command, 7),
+	}	
+}
+
+// Implementing the interface is easy
+func (r *remote) SetCommand(slot int, on, off Command) {
+	r.onCommands[slot] = on
+	r.offCommands[slot] = off
+}
+
+func (r *remote) OnButtonWasPressed(slot int) {
+	r.onCommands[slot].Execute()
+}
+
+func (r *remote) OffButtonWasPressed(slot int) {
+	r.offCommands[slot].Execute()
+}
+```
+
+Using the remote is pretty simple too, here's an example main.go (our client for this example):
+
+```go
+r := NewRemote()
+
+light := NewLight("bedroom") // A light that has On and Off methods 
+lOn := NewLightOnCommand(light) // Command interface satisfiers
+lOff := NewLightOffCommand(light)
+
+r.SetCommand(0, lOn, lOff) // Set the on and off buttons for the light to the first slot
+
+r.OnButtonWasPressed(0) // Prints out "Turning bedroom light on"
+r.OffButtonWasPressed(0) // Prints out "Turning bedroom light off"
+```
+
+The nice thing about this? We can add any commands we want to our remote. It doesn't matter if it's
+as simple as turning on a light bulb or as complicated as turning on the stereo, setting it to CD
+mode, and turning the volume up. Here's some code for a stereo:
+
+```go
+type Stereo interface {
+	On()
+	Off()
+	SetCD()
+	SetVolume(level int)
+	// ... probably lots more
+}
+
+func NewStereoOnWithCD(s Stereo) Command {
+	return stereoOnWithCD{s: s}
+}
+
+type stereoOnWithCD struct {
+	s Stereo
+}
+
+func (s stereoOnWithCD) Execute() {
+	s.s.On()
+	s.s.SetCD()
+	s.s.SetVolume(11) // Why 11? Cause it's one louder than 10
+}
+
+// Off is just a command that runs s.s.Off()
+```
+
+Now here's how we could use it. Imagine this code after the remote instantiation above
+
+```go
+// I didn't show you this implementation, but NewStereo returns something that satisfies the Stereo
+// interface... trust me.
+s := NewStereo("living room")
+sOn := NewStereoOnWithCD(s)
+sOff := NewStereoOff(s)
+
+r.SetCommand(1, sOn, sOff)
+r.OnButtonWasPressed(1) // Prints out for each step of the stereo execution
+r.OffButtonWasPressed(1) // Prints out "Turning living room stereo off"
+```
+
+We didn't have to change our remotes code at all and we were able to tell it how to turn on and off
+a brand new device. That's the power of the command pattern and dependency inversion.
+
+For bonus points, let's add the ability to create arbitrary lists of commands to run, aka Macros.
+We'll make a new command for this, the MacroCommand.
+
+```go
+type macroCommand struct {
+	cmds []Command
+}
+
+// MacroCommand just executes all of its child commands!
+func (m *macroCommand) Execute() {
+	for _, cmd := range m.cmds {
+		cmd.Execute()
+	}
+}
+
+func NewMacro(cmds []Command) Command {
+	return &macroCommand{cmds: cmds}
+}
+```
+
+Now let's use it back in our "main function" (after we have instantiated everything):
+
+```go
+// Turn on the lights and the stereo! Party time!
+macroOn := NewMacro(lOn, sOn)
+macroOff := NewMacro(lOff, sOff)
+r.SetCommand(2, macroOn, macroOff)
+
+r.OnButtonWasPressed(2) // Prints all the commands for turning on lights and stereo
+r.OffButtonWasPressed(2) // Prints the output from turning the lights and stereo off
+```
+
+That's pretty much it for command pattern. In the book they did some stuff with undo but that's
+really as simple as you think: store the command you ran upon pressing a button and then run
+its undo method if they hit the undo button.
+
+### Adapter pattern
+
+The adapter pattern is easy to understand, because we have lots of real life examples of it. If
+you're using a laptop right now, you might even have a power adapter connected to it. A power
+adapter _adapts_ the electrical current from the wall into what your laptop actually wants to use.
+If you've travelled to another continent with your laptop, you may have had to use another
+adapter to actually plug your power adapter into the wall. In our code, the adapter pattern is
+used to make one object look like another. It makes use of object composition to do this, and
+we'll explore that more, shortly.
+
+The example they used in the book called back to the duck example from Strategy (yass, ducks!). Now
+we're going to add turkeys to the mix. Let's look at their two interfaces side by side:
+
+```go
+type Duck interface {
+	Quack()
+	Fly()
+}
+
+type Turkey interface {
+	Gobble()
+	FlyShortDistance() // Turkeys are bad at flying, but they can fly short distances!
+}
+```
+
+You can see that they're similar, but not quite the same. We can use the adapter pattern to make a
+turkey sound and act like a duck. Here's how we might do it in go.
+
+```go
+type turkeyAdapter struct {
+	t Turkey // Wrap a Turkey
+}
+
+func (t *turkeyAdapter) Quack() {
+	t.t.Gobble() // Close enough, just gobble instead
+}
+
+func (t *turkeyAdapter) Fly() {
+	// We can't fly well, so fly five times to make up for how much the duck would fly
+	for i := 0; i < 5; i++ {
+		t.t.FlyShortDistance()
+	}
+}
+```
+
+We now have a TurDuck. Here's some test code:
+
+```go
+func testDuck(d Duck) {
+	d.Quack()
+	d.Fly()
+}
+
+func main() {
+	d := NewDuck()
+	testDuck(d) // Works fine
+	t := NewTurkey()
+	turDuck := turkeyAdapter{t: t}
+	testDuck(turDuck) // Also works fine! We had to fly five times but we made it.
+}
+```
+
+In the case of go I guess we could just do this:
+
+```go
+// turkey implements Turkey interface above
+func (t *turkey) Quack() {
+	t.Gobble()
+}
+
+func (t *turkey) Fly() {
+	for i := 0; i < 5; i++ {
+		t.t.FlyShortDistance()
+	}
+}
+```
+
+Back in main:
+
+```go
+	// ... Other main function stuff above ...
+	testDuck(t)
+```
+
+We implemented the Duck interface's methods on Turkey, so now our turkey struct satisfies both the
+Duck and Turkey interfaces. I think this is worse than having an explicit adapter however, as now
+our "turkey" struct doesn't have a great name. This could lead us to even more refactoring... or we
+could define our turkeyAdapter and just wrap up a turkey whenever we need a duck. I like that more.
+
+### Facade pattern
+
+Adapter is used to make something look or act like something else. Facade is used to make something
+simpler or easier to use. In go these are especially useful, as they not only simplify the
+interfaces our code wants to use, it simplifies any tests or mock objects we would want to use in
+our code as well. Imagine we had a dependency that looked something like this:
+
+```go
+type BigInterface interface {
+	BigMethod1()
+	BigMethod2()
+	BigMethod3()
+	BigMethod4()
+	// ... on and on and on ...
+}
+```
+
+And we used it in our code like this:
+
+```go
+type widget struct {
+	builder BigInterface
+}
+
+func NewWidget(bi BigInterface) Widget {
+	return &widget{ builder: bi }
+}
+
+func (w *widget) Build() {
+	w.builder.BigMethod4()
+}
+```
+
+You can see that we only use BigMethod4 in our actual code. If we wanted to create a mock version
+of BigInterface to use in our tests, we'd have to mock out all of the methods on BigInterface to
+make it compatible. Our editor could make this easier for us, but the facade pattern can help here
+too. Let's make our own version of the interface that just includes the one method.
+
+```go
+type Builder interface {
+	BigMethod4() // This needs to be the same signature as the one we are interested in
+}
+
+type widget struct {
+	builder Builder
+}
+
+func NewWidget(b Builder) Widget {
+	return &widget{ builder: b }
+}
+
+// Build method doesn't have to change!
+```
+
+We've created a facade in front of BigInterface. Now, we depend on much less of the interface (none
+of it, in fact), and our testing mocks can now be simplified greatly.
+
+### Template Method pattern
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
