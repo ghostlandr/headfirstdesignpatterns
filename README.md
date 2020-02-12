@@ -860,15 +860,101 @@ of it, in fact), and our testing mocks can now be simplified greatly.
 
 ### Template Method pattern
 
+Template method is another pattern that is tough without inheritance, much like the command pattern. However,
+tough does not mean impossible. We don't have inheritance based template method available to us but we do have
+compositional template method available.
 
+Template method works by allowing subclasses to override certain pieces of your algorithm. Here's an example of
+what this might look like for an api handling class in Python:
 
+```python
+class ApiHandler(object):
+    def handle_request(self, request):
+        self.validate_args(request)
+        args = self.deserialize_args(request)
+        self.process(args) # Let the subclass do its work!
+        self.post_process_formatting()
+        return self.response()
 
+    def process(self, args):
+        pass
+```
 
+Here's how I might implement this class, as a new api handler:
 
+```python
+class TemplateHandler(ApiHandler):
+    def process(self, args):
+        arg = args['myThing']
+        self.do_something_with_arg(arg)
+        # ...
+```
 
+The power of this approach is we can put all of our validation and other things into ApiHandler and beef it up
+as much as we like. Then anyone who is subclassing ApiHandler gets all of that functionality. So long as we
+don't break the algorithmic flow of `handle_request`, everything will keep working as expected. Whenever I think
+about "design patterns" as a general concept, the first one that comes to mind is always the template method
+pattern, and I think it's because of this ApiHandler design.
 
+The other thing they talk about under the template method umbrella is the concept of hooks. The difference
+between hooks and the normal steps of the algorithm is that they are optional. The normal steps are generally
+marked as abstract or they'll throw a `NotImplementedException` if you're in python. Hooks on the other hand
+are just nice places to hook in and add functionality as required. If you've ever used git before you've had
+the opportunity to add hooks: pre commit hook, post commit hook, pre push hook, post push hook, etc... None of
+these hooks do anything unless you add one of your own.
 
+That's all well and good, but what about our precious go? I was trying to think of how you could use struct
+embedding or something to get this functionality, and with even more thinking I bet I could come up with
+something (so I'll leave that as a TODO here for myself), but we do have access to one of the things they talked
+about in the chapter, and that is what I'm calling compositional template method. The example they used in the
+book is around sorting arrays in Java, and so we will use the example of sorting in Go!
 
+Have you ever had to sort a slice in go? If not, you're missing out! All you need to do is implement the
+interface defined in the sort package and call sort.Sort. Here's an example from the standard lib examples:
+
+```go
+type Person struct {
+	Name string
+	Age  int
+}
+
+func (p Person) String() string {
+	return fmt.Sprintf("%s: %d", p.Name, p.Age)
+}
+
+// ByAge implements sort.Interface for []Person based on
+// the Age field.
+type ByAge []Person
+
+func (a ByAge) Len() int           { return len(a) }
+func (a ByAge) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByAge) Less(i, j int) bool { return a[i].Age < a[j].Age }
+
+func main() {
+	people := []Person{
+		{"Bob", 31},
+		{"John", 42},
+		{"Michael", 17},
+		{"Jenny", 26},
+	}
+
+	sort.Sort(ByAge(people))
+	fmt.Println(people)
+```
+
+I simplified it a bit, but this still lets you see the power of this. Here is the comment on the Sort method:
+
+```
+func Sort(data Interface)
+
+Sort sorts data. It makes one call to data.Len to determine n, and O(n*log(n)) calls to data.Less and
+data.Swap. The sort is not guaranteed to be stable.
+```
+
+It takes in a piece of data that matches its interface and returns a sorted version. This is a fantastic way
+to get around the problem that lots of go programmers run into. Imagine trying to implement sorting without
+knowing the type of data that you're sorting (for the sake of comparing them)? Well, just defer that as part of
+a template method onto the implementer and you're done.
 
 
 
