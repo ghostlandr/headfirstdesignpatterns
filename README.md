@@ -960,5 +960,3 @@ a template method onto the implementer and you're done.
 
 
 
-
-
