@@ -3,7 +3,7 @@
 package main
 
 import (
-"fmt"
+	"fmt"
 )
 
 type Flyer interface {
@@ -37,6 +37,14 @@ func (d Duck) getFlyer() Flyer {
 
 func NewDuck(q Quacker, f Flyer) Duck {
 	return Duck{fly: f, quack: q}
+}
+
+func (d *Duck) SetQuacker(q Quacker) {
+	d.quack = q
+}
+
+func (d *Duck) SetFlyer(f Flyer) {
+	d.fly = f
 }
 
 type ItQuacks struct{}
@@ -75,6 +83,15 @@ func NewFlyNoWings() Flyer {
 	return FlyNoWings{}
 }
 
+type FlyRocketPowered struct{}
+func (f FlyRocketPowered) Fly() {
+	fmt.Println("Flying with rocket power!")
+}
+
+func NewFlyRocketPowered() Flyer {
+	return FlyRocketPowered{}
+}
+
 func main() {
 	mallard := NewDuck(NewItQuacks(), NewFlyWithWings())
 	mallard.Quack()
@@ -87,5 +104,11 @@ func main() {
 	woodenDuck := NewDuck(NewSilentQuack(), NewFlyNoWings())
 	woodenDuck.Quack()
 	woodenDuck.Fly()
+
+	modelDuck := NewDuck(NewItQuacks(), NewFlyNoWings())
+	modelDuck.Quack()
+	modelDuck.Fly() // No flying :(
+	modelDuck.SetFlyer(NewFlyRocketPowered())
+	modelDuck.Fly() // We flyin'!
 }
 

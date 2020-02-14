@@ -17,7 +17,7 @@ ends up being.
 ### Strategy pattern
 
 This pattern used ducks, which was enjoyable for me on a personal level - my favourite bird for sure, maybe my
-favourite animal in general is the mallard duck. The idea with the strategy pattern is that rather than make a
+favourite animal in general, is the mallard duck. The idea with the strategy pattern is that rather than make a
 subclass for every type and configuration of object, instead provide different strategies that a smaller set of
 objects can interact with. So for ducks, there are strategies for making sound and for flying. In my go code I
 ended up making a Flyer and a Quacker interface (verbs in the classic go style). A Duck then is a struct made up
@@ -52,8 +52,67 @@ mallard.Fly()
 
 In my case those methods just print out whatever the strategy enables, so it would print something about quacking
 and flying respectively. But for a rubber duck, it would use the `NewFlyNoWings()` (that's what they had in the book,
-ha). Thus when trying to make it quack and fly, it would print about quacking, but say it can't fly. Contrived
-but effective for learning, I thought. I can see some applications in my own code for this one.
+ha). Thus when trying to make it quack and fly, it would print about quacking, but say it can't fly. Here is a
+rubber duck (squeaks, no flying) and a wooden duck (doesn't quack, doesn't fly):
+
+```go
+rubberDuck := NewDuck(NewItQuacks(), NewFlyNoWings())
+woodenDuck := NewDuck(NewSilentQuack(), NewFlyNoWings())
+```
+
+The other big thing about strategy pattern is you are able to swap strategies at runtime. So we could add some
+setter methods to our Duck that allow us to update it on the fly (get it?). The example they use is of a model
+duck that they later attach a rocket to. Let's see what that looks like.
+
+```go
+func (d *Duck) SetQuacker(q Quacker) {
+	d.quack = q
+}
+
+func (d *Duck) SetFlyer(f Flyer) {
+	d.fly = f
+}
+
+// And our new fly style
+type FlyRocketPowered struct{}
+func (f FlyRocketPowered) Fly() {
+	fmt.Println("Flying with rocket power!")
+}
+
+func NewFlyRocketPowered() Flyer {
+	return FlyRocketPowered{}
+}
+```
+
+Then, in our main function:
+
+```go
+modelDuck := NewDuck(NewItQuacks(), NewFlyNoWings())
+modelDuck.Quack()
+modelDuck.Fly() // No flying :(
+modelDuck.SetFlyer(NewFlyRocketPowered())
+modelDuck.Fly() // We flyin'!
+```
+
+This book is, naturally, heavily focused on Object Oriented (OO) programming and principles. That's kind of the
+point, from their perspective. One of the principles they introduce in this chapter is that you should encapsulate
+the behaviours (and code) that change and move them away from the things that stay the same. Earlier on I said
+that the alternative to a design like what we have now is to have a subclass for every type of duck. So say we
+have classes like a MallardDuck, RubberDuck, ModelDuck, etc. that all subclass Duck and override functionality.
+If we need to add or remove functionality, we now need to go into every subclass and change it. By using the
+strategy pattern and allowing ducks to use different strategies based on what they need we are able to encapsulate
+those changes into the strategies, rather than leaving them in the concrete ducks. Speaking of that, ConcreteDuck
+would be an interesting class to implement - I'll leave it as an exercise for the reader.
+
+The biggest takeaway from this pattern: Take what varies and encapsulate it so it won't affect the rest of your
+code. A very recent real world example of this came up just the other day. In some front end code we needed to
+show a different dialog based on which page of the app we were on. We could have checked the url in the dialog
+itself and done a bunch of ternary logic to switch what we were showing, or we could encapsulate that change
+further up and show a totally different dialog based on the page. This allows us to have two separate dialogs
+that can be developed independently. If we need another dialog some day, we have an easy insertion point now too
+- we don't have to add further ternary expressions or switches or anything like that. As with all OO design,
+it's a matter of tradeoffs. Yes, it is slightly more code and another class and etc., but the added clarity is
+worth it in this case.
 
 ### Observer pattern
 
