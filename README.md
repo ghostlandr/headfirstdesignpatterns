@@ -116,20 +116,57 @@ worth it in this case.
 
 ### Observer pattern
 
-This is a pattern I am much more familiar with, as I have a stronger frontend skill set still. In this chapter we
-implemented a weather data collection station. It starts out as a very imperative, "This thing updated, manually
-update all of the classes we know are depending on us". One of the places they suggest you try and apply design
-patterns is any spots in the code that are likely to change frequently. In our weather station example, it's
-laid out like this: there is a weather data class that "gets" updated weather data intermittently. When it does
-so, it updates three (for now) weather displays - this is our client code for this chapter. One of the principles
-they talk about in chapter 3 (I think) is the Open-Closed principle: Our code should be open for extension, but
-closed for modification. (This is a principle that I've longed to understand, and now it finally feels like I do
-after reading a few of these chapters!) In our weather station as it stands today, every time we add a new
-weather display we will need to modify the weather data station code! Not very "closed" at all. Thus we enter
-the Observer pattern. Rather than adding code to our "new weather data" function in the weather data station, we
-give displays the ability to subscribe to updates. Therefore if we want to add a new weather display at some point
-in the future we don't have to modify the weather data station code, we just subscribe through the interface we
-already have available. Here's how I did that in go:
+This is a pattern I am much more familiar with, as I have a stronger frontend skill set. In this chapter, we
+implemented a weather data collection station. Let's have a look at some code. In our weather station
+example, it's laid out like this: there is a weather data class that gets updated weather data intermittently.
+When it does so, it updates three (for now) weather displays - this is our client code for this chapter. Here's
+the first go at it, imperative-style:
+
+```go
+type WeatherStation interface {
+    UpdateWeather(temp, humidity, pressure float64)
+}
+
+type weatherStation struct {
+    forecast Display
+    current Display
+    statistics Display
+}
+
+func NewWeatherStation(forecast, current, statistics Display) WeatherStation {
+    return &weatherStation{
+        forecast: forecast,
+        current: current,
+        statistics: statistics,
+    }
+}
+
+func (w *weatherStation) UpdateWeather(temp, humidity, pressure float64) {
+    // Update each of our displays!
+    w.forecast.Update(temp, humidity, pressure)
+    w.current.Update(temp, humidity, pressure)
+    w.statistics.Update(temp, humidity, pressure)
+}
+
+// Stitch it all together in a main function (not shown)
+```
+
+This code works, but it is fragile and tightly coupled to the three specific displays we have available to us
+right now. How can we use object-oriented principles and patterns to our advantage here?
+
+One of the places they suggest you try and apply design patterns is any spots in the code that are likely
+to change frequently. One of the principles they talk about in chapter 3 (I think) is the Open-Closed principle:
+Our code should be open for extension but closed for modification. (This is a principle that I've longed to
+understand, and now it finally feels like I do after reading a few of these chapters!) In our weather station as
+it stands today, every time we add a new weather display we will need to modify the weather data station code!
+Not very "closed" at all.
+
+Enter: the Observer pattern. Rather than adding code to our "update weather"
+function in the weather data station, we give displays the ability to subscribe to updates. Therefore if we want
+to add a new weather display at some point in the future we don't have to modify the weather data station code,
+we just subscribe through the interface we already have available. This decouples the display from the station
+and vice versa. Here's what some observer and observable interfaces could look like for our weather station
+scenario:
 
 ```go
 type Observer interface {
@@ -139,23 +176,41 @@ type Observer interface {
 type Observable interface {
 	RegisterSubscriber(o Observer)
 	RemoveSubscriber(toRemove Observer)
-	NotifySubscribers()
+	NotifySubscribers(temp, hum, pressure float64)
 }
 
-type WeatherData struct {
+type weatherData struct {
 	temp, humidity, pressure float64
 	observers []Observer
 }
+
+// Implement the Observable interface with weatherData (not shown, but described below)
 ```
 
 The register, remove, and notify functions all work like you'd expect: either append to the slice, remove from
-the slice, or iterate the slice. Then it's a simple matter of calling NotifySubscribers() whenever you "get a new
-update" in the WeatherData implementation.
+the slice, or iterate the slice and call the Update function on subscribers. Then it's a simple matter of
+calling NotifySubscribers() whenever you "get a new update" in the WeatherData implementation. Here's a possible
+main function implementation for the station:
 
-A real life example of the observer pattern is one I used often when working in Javascript - `addEventListener`.
+```go
+w := weatherdata.New()
+curr := &displays.CurrentConditions{}
+fore := &displays.ForecastDisplay{}
+stat := &displays.StatisticsDisplay{}
+w.RegisterSubscriber(curr)
+w.RegisterSubscriber(fore)
+w.RegisterSubscriber(stat)
+w.NotifySubscribers(23.4, 90, 32)
+curr.Display() // See the current temperature and such
+w.NotifySubscribers(20.3, 80, 40)
+curr.Display() // See the new current temperature and such
+```
+
+A real-life example of the observer pattern is one I used often when working in Javascript - `addEventListener`.
 You add a callback that should be run on a particular event on pretty well anything in Javascript (classic), but
 most often DOM nodes. Something like `myButton.addEventListener('onclick', function() { console.log('hello!') })`
-where myButton is a DOM node you'd have to grab earlier.
+where myButton is a DOM node you'd have to grab earlier. Any time the `onclick` event happens on `myButton`, your
+anonymous function will fire, and `myButton` is none the wiser.
 
 This chapter was a good one for boosting my confidence in reading the book as I had it pretty well understood.
 
@@ -165,15 +220,15 @@ Going into this chapter, I assumed we'd be using the @ sign a lot, as I'm used t
 However, there were no @ signs at all in this chapter. This was also a relief because go doesn't have such things,
 so it would have been interesting to try and figure out how to work around that.
 
-This pattern centered around a coffee shop example. You start out with a `Beverage` class which exposes a cost
+This pattern centred around a coffee shop example. You start out with a `Beverage` class which exposes a cost
 method that subclasses override to provide their cost. The coffee shop has four main beverages: dark roast,
 house blend, decaf, and espresso. Then they have the usual suspects available as toppings/condiments: soy milk,
-whip, mocha, and steamed milk. Initially they created a subclass for every combination of beverage, and you can
+whip, mocha, and steamed milk. Initially, they created a subclass for every combination of beverages, and you can
 imagine the carnage this creates: `DarkRoast`, `DarkRoastMocha`, `DarkRoastMochaWhip`, `DarkRoastSoy`, ... and
 on and on. Dozens of classes. And what about things like double mocha? `DarkRoastMochaMocha`? This is getting
 crazy!
 
-Enter: the decorator pattern. The other principle this chapter introduces is "programming to an interface, not
+Behold the decorator pattern. The other principle this chapter introduces is "programming to an interface, not
 a concrete implementation". If we base our implementation off of a Beverage interface, such as this one:
 
 ```go
@@ -197,7 +252,7 @@ fmt.Printf("%s: $%.2f\n", e.Description(), e.Cost()) // output: "Espresso, Mocha
 e2 := beverage.Whip(beverage.Mocha(beverage.Espresso()))
 ```
 
-If you were curious, here is some of my implementation of these. It's a bit more annoying than in a true OO
+If you were curious, here are some of my implementations of these. It's a bit more annoying than in a true OO
 language with subclassing and such, but really, I could see myself using something like this in real life.
 
 ```go
@@ -244,11 +299,12 @@ def my_function():
 ```
 
 and by doing so, you gain access to a few lifecycle hooks for the function and you can run your decorator before,
-during(?), or after the function you're wrapping is called. In our code's case I guess we're running our code
-after, since we call the wrapped function and then add our own text.
+during(?), or after the function, you're wrapping is called. In our code's case, I guess we're running our code
+after since we call the wrapped function and then add our own text. However, since we are wrapping something,
+we could call the wrapped functions whenever we want.
 
 One of the things they admit to in this chapter is that this _is_ a bit cumbersome. They say this will be helped
-a bit when we start learning the Factory pattern in the next chapter. In my mind the main takeaway from this
+a bit when we start learning the Factory pattern in the next chapter. In my mind, the main takeaway from this
 chapter is that you should program to an interface, not a concrete implementation. In go-land, this means you
 should program to an interface, not a concrete struct. This enables you to do all kinds of things (dependency
 injection and testing come to mind first), but I hadn't really grasped the real "why" until reading this chapter
