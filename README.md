@@ -318,6 +318,8 @@ the look of your class diagram after you've done some work to implement it. Rath
 down into each other, as you might normally see in inheritance, you've inverted the flow. Your high-level and
 low-level modules are both depending on the same abstraction.
 
+_picture of before and after dependency inversion_
+
 How does this come into play with factories? Let's use the example from the chapter: Pizza stores.
 
 (side note: I quite enjoy the examples used in this book. I'm sure they are chosen for this very reason, but I
@@ -325,7 +327,7 @@ find them to be very relatable and reasonable. Like we're talking about "the fac
 lens of a pizza store and franchises, so of course it makes sense to make sure things are created the same way
 every time and things like that, so providing a way for our franchisees to do that is totally necessary.)
 
-We start out with code we've probably all written before. We have one pizza store, with a order pizza method
+We start out with code we've probably all written before. We have one pizza store, with an order pizza method
 and it all looks like this:
 
 ```go
@@ -365,7 +367,7 @@ func main() {
 ```
 
 This is fine for our one store, and at least we do have some amount of abstraction here: we're using polymorphism
-to treat every type of pizza the same once we get down to the prepare and ship step. However you can see that this
+to treat every type of pizza the same once we get down to the prepare and ship step. However, you can see that this
 quickly grows out of control once we add more pizzas and more regions to our franchise. As well, you can see we're
 using a method like "NewWhateverTypeOfPizza", which means we're now coding to a concrete type rather than an interface,
 and it also means whenever we need to add a new kind of pizza we need to come into this code and modify it to add
@@ -397,13 +399,13 @@ func (p *pizzaFactory) CreatePizza(pizzaType string) Pizza {
     // Error handling down here in case they gave a weird pizza type
 }
 
+type pizzaStore struct {
+    PizzaFactory
+}
+
 func NewPizzaStore(factory PizzaFactory) PizzaStore {
     // Embed the factory in our concrete pizza store
     return &pizzaStore{PizzaFactory: factory}
-}
-
-type pizzaStore struct {
-    PizzaFactory
 }
 
 func (p *pizzaStore) OrderPizza(pizzaType) Pizza {
@@ -418,7 +420,7 @@ func (p *pizzaStore) OrderPizza(pizzaType) Pizza {
 }
 ```
 
-Why is this better? Well, now if we want to add a new pizza type we can just add it into CreatePizza. No need to
+Why is this better? Well, now if we want to add a new pizza type we can just add it to CreatePizza. No need to
 modify OrderPizza, which now follows the Open-Closed principle - it's open to extension by adding new pizzas to
 CreatePizza, but closed to modification as we don't need to do that to add new pizzas.
 
@@ -443,15 +445,15 @@ public abstract class PizzaStore {
 
 Now what you would do is subclass PizzaStore and override createPizza to do your pizza making. This lets us
 nail down the orderPizza method so that it can't be tampered with, but allows us to put the power in the hands of
-the pizza store to create pizzas however they like. In the book they talk about New York style pizza versus Chicago
+the pizza store to create pizzas however they like. In the book they talk about New York-style pizza versus Chicago
 style, two very different types of pizza to say the least. So you'd have a ChicagoPizzaStore creating Chicago-style,
-and a NYPizzaStore creating New York-style. Life is good. In Go-land however, all we can really share is the
+and an NYPizzaStore creating New York-style. Life is good. In Go-land however, all we can really share is the
 interface for making pizzas. We can't provide a piece of functionality for classes to embed, or at least we can't
 prevent them from doing their own thing there, at least not without making some of the structs or interfaces
-internal. I could see if you had a `pizza` (unexported) type and a `orderPizza` method that talked in lower-case
+internal. I could see if you had a `pizza` (unexported) type and an `orderPizza` method that talked in lower-case
 p pizzas, maybe you could protect that process?
 
-The thing we've specced out in the Java code is known as a Factory Method. Responsibility for what it creates
+The thing we've spec'd out in the Java code is known as a Factory Method. Responsibility for what it creates
 is left up to subclasses of the main class. You've managed to decouple the creations from the creator, as any
 changes we make to Pizza won't affect the creating classes, so long as the interface doesn't change.
 
