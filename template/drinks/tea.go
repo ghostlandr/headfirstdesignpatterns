@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// NewTea creates a new Drink, modelled after a Tea
 func NewTea() Drink {
 	return &tea{}
 }

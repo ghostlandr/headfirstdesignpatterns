@@ -11,4 +11,7 @@ func main() {
 
 	t := brewer.NewBeverage(drinks.NewTea())
 	t.PrepareRecipe()
+
+	g := brewer.NewBeverage(drinks.NewTea())
+	g.PrepareRecipe()
 }
